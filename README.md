@@ -1,4 +1,4 @@
-## Ma415-twitter-analytics
+## Ma415 Final Project: Twitter Analytics
 Use R to acquire, explore, clean and organize data. Use R packages to manipulate and analyze data. Present results with tables, plots, and interactive graphics. Produce documents, presentations, and web pages
 
 ## Prerequisites:
