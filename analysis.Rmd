@@ -98,6 +98,7 @@ CleanTweets <- function(df) {
   #removes emoticons #ref: (Hicks , 2014)
   clean_text <- sapply(clean_text,function(row) iconv(row, "latin1", "ASCII", sub=""))
   clean_text = gsub("&amp", "", clean_text)       # & sign
+  clean_text = gsub("(RT|via)((?:\\b\\W*@\\w+)+)", "", clean_text)  #retweets
   clean_text = gsub("@\\w+", "", clean_text)        # @'s
   clean_text = gsub("[[:punct:]]", "", clean_text)  # punctuation
   clean_text = gsub("[[:digit:]]", "", clean_text)  # digits
