@@ -27,16 +27,22 @@ knitr::include_graphics("./assets/img.jpg")
 ## Sentimenal Analysis of Text
 Using get_nrc_sentiment() from the `syuzhet` package to analyze the snetiments in the tweets collected, we notice that most tweets had a negative sentiments comapred to positive ones. Categories "negative" and "fear" are the most frequent among the tweets. 
 
-```{r, echo=FALSE, out.width = "350px", fig.align="center"}
+```{r, echo=FALSE, out.width = "450px", fig.align="center"}
 knitr::include_graphics("./assets/EDA_sentiment.png")
 ```
 
-## Sentiment Polarity of Sentiment
-I used the sentimental analysis above and combined the positive feelings (joy, trust, positive, anticipation) count, and the negative (anger, disgust, fear, sadness, negative) feelings count, and calculated the precentages of each. I created a table and used a pie chart to visualize it. 
+## Polarity of Sentiment
+I used the sentimental analysis above and combined the positive feelings (joy, trust, positive, anticipation) count, and the negative (anger, disgust, fear, sadness, negative) feelings count, and calculated the precentages of each.
 
-  Again, here were see the overall breakdown of polarity of sentiment. Negative sentiment dominates the tweets overall.
+```{r, echo=FALSE, out.width = "200px", results='asis'}
+df <- read.csv(file="./data/polarity.csv", header=TRUE)
+knitr::kable(df, caption = "Polarity Table")
+```
 
-```{r, echo=FALSE, out.width = "400px", fig.align="center"}
+## Visualizing Sentiment Polarity
+I used a pie chart to visualize the table in the previous slide. Again, here were see the overall breakdown of polarity of sentiment. Negative sentiment dominates the tweets overall.
+  
+```{r, echo=FALSE, out.width = "500px", fig.align="center"}
 knitr::include_graphics("./assets/pie.jpg")
 ```
 
