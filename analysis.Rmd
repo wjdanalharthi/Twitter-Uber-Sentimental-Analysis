@@ -4,10 +4,11 @@ author: "Wjdan Alharthi"
 date: "December 14, 2017"
 output:
   html_document: default
-  pdf_document: default
 ---
 
-![](./uber.jpg)
+```{r, echo=FALSE, out.width = "200px", fig.align="center"}
+knitr::include_graphics("./assets/uber.jpg")
+```
 
 # Introduction
   Uber has dominated the private transportation business in the past 8 years. What began in 2008 as a luxury car service in San Francisco, CA is now valued at $70 billion and operates in more than 300 cities worldwide. To passengers, it's a convenient, affordable service. 
@@ -17,7 +18,7 @@ output:
 # Requirements
   Load the needed libraries for this analysis. I wrote a function called GetPackage() to install the CRAN-supported packages automatically. Then I created a list of the packages we need and used a for-loop to call GetPackage() on the list of packages. 
 
-```{r, message=F, warning=F}
+```{r, message=FALSE, warning=FALSE}
 # input: package name, it loads it and installs if in needed
 GetPackage <- function(x) {
   x <- as.character(x)
@@ -139,10 +140,7 @@ brand <- "Uber"
 
 ########################################## reads 
 
-#tweets <- read.csv("./tweetsDF.csv", header=TRUE)
-#tweets <- read.csv("./merged_tweets.csv", header=TRUE)
-#tweets <- read.csv("./merged_tweets_2.csv", header=TRUE)
-tweets <- read.csv("./tweetsDB.csv", header=TRUE)
+tweets <- read.csv("./data/tweetsDB.csv", header=TRUE)
 
 ########################################## cleaning
 
@@ -184,15 +182,15 @@ GetSentimentalTable <- function(twts_txt) {
 Now we can analyze the tweets using the function above, and plot it with ggplot2!
 ```{r, include=T}
 
-df.sentiment <- GetSentimentalTable(cleaned_tweets)
-#write.csv(df.sentiment, file="./general_sentiment.csv", row.names=FALSE)
-#df.sentiment <- read.csv("./general_sentiment.csv", header=TRUE)
+#df.sentiment <- GetSentimentalTable(cleaned_tweets)
+#write.csv(df.sentiment, file="./data/general_sentiment.csv", row.names=FALSE)
+df.sentiment <- read.csv("./data/general_sentiment.csv", header=TRUE)
 
 ggplot(df.sentiment, aes(x = reorder(sentiment, -count), y = count)) +
         geom_bar(aes(fill = sentiment), stat = "identity") +
         theme(legend.position = "none") +
         xlab("Sentiment") + ylab("Total Count") + ggtitle("Sentiment Graph")
-#ggsave("./EDA_sentiment.png")
+ggsave("./assets/EDA_sentiment.png")
 
 ```
 
@@ -224,7 +222,7 @@ polatiryTable <- rbind(polatiryTable, data.frame("polarity" = "negative", "prece
 polatiryTable <- rbind(polatiryTable, data.frame("polarity" = "neutral", "precentage"=round(neutral_precentage, digit=2)))
 
 polatiryTable
-#write.csv(polatiryTable, file="./polarity.csv", row.names=FALSE)
+write.csv(polatiryTable, file="./data/polarity.csv", row.names=FALSE)
 
 ```
 
@@ -287,9 +285,9 @@ temp <- subset(temp, select = c("text", "created", "retweetCount"))
 temp$created <- as.Date(temp$created)
 
 # obtain the sentiment scores per tweet
-score <- GetSentimentPerTweet(temp$text)
-#write.csv(score, file="./detailed_sentiment.csv", row.names=FALSE)
-#score <- read.csv("./detailed_sentiment.csv", header=TRUE)
+#score <- GetSentimentPerTweet(temp$text)
+#write.csv(score, file="./data/detailed_sentiment.csv", row.names=FALSE)
+score <- read.csv("./data/detailed_sentiment.csv", header=TRUE)
 
 # add the new scores col to out dataframe and create a new dataframe
 df.scores <- cbind(temp, score)
@@ -335,7 +333,7 @@ ggplot(df.ordered, aes(created, score)) +
   geom_point(aes(group=sentiment, color=sentiment), size=4) + 
   ggtitle("Sentiment of Tweets Overtime")
 
-ggsave("./EDA_sentimentTime.png")
+ggsave("./assets/EDA_sentimentTime.png")
 
 ```
 
@@ -356,7 +354,7 @@ ggplot(df.retweet, aes(x=sentiment)) +
   theme(legend.position="right") +
   ylab("Number of Tweets") + xlab("Polarity Categories")
 
-ggsave("./EDA_sentimentRetweet.png")
+ggsave("./assets/EDA_sentimentRetweet.png")
 
 ```
 
@@ -392,7 +390,9 @@ Using statistical equations and simple math functions on the frequenies table
 
 ```{r}
 
-frequencyTable <- GetFrequencyTable(cleaned_tweets)
+#frequencyTable <- GetFrequencyTable(cleaned_tweets)
+#write.csv(frequencyTable, file="./data/frequencies.csv", row.names=FALSE)
+frequencyTable <- read.csv("./data/frequencies.csv", header=TRUE)
 
 p1 <- paste("mean is: ", mean(frequencyTable$freq))
 p2 <- paste("median is: ", median(frequencyTable$freq))
@@ -428,7 +428,7 @@ ggplot(barGraph, aes(x = reorder(words, freq), y = freq)) +
         geom_bar(aes(fill = freq), stat = "identity") +
         theme(legend.position = "none") +
         xlab("Words") + ylab("Count") + ggtitle("Words Frequencies") + coord_flip()
-ggsave("./EDA_frequency.png")
+ggsave("./assets/EDA_frequency.png")
 ```
 
 ### Histogram
