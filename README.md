@@ -30,6 +30,6 @@ Use R to acquire, explore, clean and organize data. Use R packages to manipulate
 	- The packages below will be installed automatically when you run the shiny app or knit the markdown
 	- twitteR, ROAuth, ggplot2, tm, plyr, leaflet, maps, tmap, syuzhet, Hmisc, stringr, dplyr
 
-# How to run Shiny app:
+## How to run Shiny app:
 - Shiny App: open server.R and ui.R and `run` either. It will load required packages and authenticate twitter access. I couldn't publish the app since I am doing the twitter authentication through the shiny app server.
 
