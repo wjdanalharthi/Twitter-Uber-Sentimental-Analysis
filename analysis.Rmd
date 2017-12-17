@@ -1,0 +1,497 @@
+---
+title: 'MA415 Final Project: Analysis of Tweets on Uber Services'
+author: "Wjdan Alharthi"
+date: "December 14, 2017"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+![](./uber.jpg)
+
+# Introduction
+  Uber has dominated the private transportation business in the past 8 years. What began in 2008 as a luxury car service in San Francisco, CA is now valued at $70 billion and operates in more than 300 cities worldwide. To passengers, it's a convenient, affordable service. 
+  However, recently Uber rides fares have increased very quickly in the past year. In addition, they have implmented new algorithms for finding fastest routes and optimizing the pick up and drop off schedule of shared rides, and such new features had positive and negative impact on the quality of service.
+  Therefore, for this analysis, I was curious about what the tweets on Uber say, how frequent they are, and from where are they being tweeted! I will use Twitter's API to obtain tweets on Uber and analyze them in R.
+
+# Requirements
+  Load the needed libraries for this analysis. I wrote a function called GetPackage() to install the CRAN-supported packages automatically. Then I created a list of the packages we need and used a for-loop to call GetPackage() on the list of packages. 
+
+```{r, message=F, warning=F}
+# input: package name, it loads it and installs if in needed
+GetPackage <- function(x) {
+  x <- as.character(x)
+  if (!require(x,character.only=TRUE)) {
+   install.packages(pkgs=x,repos="http://cran.r-project.org")
+   require(xcharacter.only=TRUE)
+ }
+}
+
+# list of needed packages
+LIST_OF_PACKAGES <- c("twitteR", "ROAuth", "devtools", 
+                      "ggplot2", "syuzhet", "Hmisc",
+                      "stringr", "tm", "plyr", "dplyr",
+                      "mapview", "leaflet", "maps", "tmap")
+
+# load all packages in the list 
+for (psk_name in LIST_OF_PACKAGES){
+  GetPackage(psk_name)
+}
+```
+
+# Preparation for Data Collection and Cleaning
+  In this section, we will collect the tweets and clean them for the purposes of this analysis.
+
+## Twitter Authentication Setup
+  After creating a developer account on Twitter, I obtained the necessary tokens to setup the twitter API authentication. Below are my keys and a call to setup_twitter_oauth() for validation.
+
+```{r}
+
+# twitter auth vars
+CONSUMER_KEY="n0VQmi2OXrFQxoPvYvx2FIknI"
+CONSUMER_SECRET="hTkHfzJrIzQvpwAJLZAQYoyz3iryEEbX8gBlJloQedr51pNlRw"
+TOKEN="871919779426308099-Yn40D6rcq7zcC2qJowKB8aUvgSLpZVt"
+TOKEN_SECRET="aOBkoIl6wJXYcHMgstf9BuK3OapE5DNKMyr0sfycr3tQE"
+  
+# twitter auth set-up
+setup_twitter_oauth(consumer_key=CONSUMER_KEY,
+                      consumer_secret=CONSUMER_SECRET,
+                      access_token=TOKEN,
+                      access_secret=TOKEN_SECRET)
+```
+
+## Function for Search Related Tweets
+  Next we create the search name. Since twitter API allows us to search for terms with logical operators such as "OR" and "AND", I constructed my search term such that it fetches tweets with "@" sign for replies and mentions, or "#" sign for related hashtags, and a general use of the word. 
+  
+  After that, I use searchTwitter() functionto search for tweets with the contructed search terms above. I also specify the language as english, and the number of tweets as n. This function will be useful for tweets collection later.
+
+```{r, message = FALSE, warning = FALSE}
+brand <- "uber"
+
+Search_Twitter <- function(key_word, n=500) {
+  # contructing the search clause
+  search_term <- paste0('@', key_word, ' OR ', key_word, ' OR ', '#', key_word)
+  
+  # print
+  print(paste0("searching: ", search_term))
+  
+  # search twitter
+  twtList <- searchTwitter(search_term, n=n, lang="en", retryOnRateLimit=120)
+  twtList <- strip_retweets(twtList, strip_manual = TRUE, strip_mt = TRUE)
+  
+  # convert to a dataframe and return
+  return (twListToDF(twtList))
+}
+```
+
+## Extracting and Cleaning Tweets
+  searchTwitter() returns a special type of objects of type 'status-class' which contains information about the retreived tweets. We need to extract the texts from these objects, and clean the text from common charachters that we don't want to include in our analysis. We will use the clean text for the sentimental analysis and frequency graphs.
+
+```{r}
+
+# takes a dataframe of tweet objects then extracts and cleans text
+CleanTweets <- function(df) {
+  # extract text
+  clean_text = df$text
+      
+  #removes emoticons #ref: (Hicks , 2014)
+  clean_text <- sapply(clean_text,function(row) iconv(row, "latin1", "ASCII", sub=""))
+  clean_text = gsub("&amp", "", clean_text)       # & sign
+  clean_text = gsub("@\\w+", "", clean_text)        # @'s
+  clean_text = gsub("[[:punct:]]", "", clean_text)  # punctuation
+  clean_text = gsub("[[:digit:]]", "", clean_text)  # digits
+  clean_text = gsub("http\\w+", "", clean_text)     # urls
+  clean_text = gsub("[ \t]{2,}", "", clean_text)    # brakets curly and sq
+  clean_text = gsub("^\\s+|\\s+$", "", clean_text)  # spaces
+      
+  # remove common words 
+  # collected common words in english
+  common_words <- c('the', 'and', 'that', 'not', 'you', 'this', 'but',
+                    'his', 'they', 'her', 'she', 'will', 'one', 'all',
+                    'would', 'there', 'the', 'for', 'with', 'from', 
+                    'about', 'into', 'over', 'after')
+  for (word in common_words) {
+    clean_text = gsub(word, "", clean_text)
+  }
+      
+  # also the search term!
+  clean_text = gsub(tolower(brand), "", clean_text)
+  clean_text = gsub(capitalize(brand), "", clean_text)
+  
+  return (clean_text)
+}
+
+```
+
+# Data Collection
+  Now that we have the functions to collection and clean the tweets, let's collect tweets on Uber! 
+  
+  I have previously collected a large number of tweets over a span of 8 days (Dec. 9 - 16, 2017). I saved the tweets in a 'csv' file in the same directory, and here I am loading the tweets using read.csv(). Then I clean the tweets text using CleanText() defined above. 
+  
+  Other cleaning operations on the dataframe include removing uneeded columns, omitting NA rows. However, for the latter, since most of the tweets are not geocoded, most rows will be omitted. Thus, if we need to remove NA's, we must specify the columns we want to clean (not needed for this analysis).
+
+```{r}
+brand <- "Uber"
+
+########################################## searches 
+
+#tweets <- Search_Twitter(brand, n=2000)
+
+########################################## reads 
+
+#tweets <- read.csv("./tweetsDF.csv", header=TRUE)
+#tweets <- read.csv("./merged_tweets.csv", header=TRUE)
+#tweets <- read.csv("./merged_tweets_2.csv", header=TRUE)
+tweets <- read.csv("./tweetsDB.csv", header=TRUE)
+
+########################################## cleaning
+
+# remove duplicate tweets!
+# tweets = tweets[!duplicated(tweets$text),]
+
+# get text
+cleaned_tweets <- CleanTweets(tweets)
+
+# PROBLEM HERE: 99% of the tweets are not geocoded ==> all will be omitted!
+#tweets = na.omit(tweets) # removing the rows with missing values. 
+
+```
+
+## Sentimental Analysis
+  I use get_nrc_sentiment() from the `syuzhet` package which implements Saif Mohammad’s NRC Emotion lexicon. It uses a list of words and their associations with eight emotions (anger, fear, anticipation, trust, surprise, sadness, joy, and disgust) and two sentiments (negative and positive)” (See http://www.purl.org/net/NRCemotionlexicon). 
+  Below is a function that uses the package to analyse the tweets, and returns a dataframe with names columns.
+
+```{r}
+
+GetSentimentalTable <- function(twts_txt) {
+	# analyze with the library
+	ext_sentiment <- get_nrc_sentiment(twts_txt,  language = "english")
+	  
+	# aggregate sentiments into a new object
+	sentimentTotals <- data.frame(colSums(ext_sentiment))
+	  
+	# give column names
+	names(sentimentTotals) <- "count"
+	sentimentTotals <- 
+	  cbind("sentiment" = rownames(sentimentTotals), sentimentTotals)
+  rownames(sentimentTotals) <- NULL
+	  
+	return (sentimentTotals)
+}
+	
+```
+
+Now we can analyze the tweets using the function above, and plot it with ggplot2!
+```{r, include=T}
+
+df.sentiment <- GetSentimentalTable(cleaned_tweets)
+#write.csv(df.sentiment, file="./general_sentiment.csv", row.names=FALSE)
+#df.sentiment <- read.csv("./general_sentiment.csv", header=TRUE)
+
+ggplot(df.sentiment, aes(x = reorder(sentiment, -count), y = count)) +
+        geom_bar(aes(fill = sentiment), stat = "identity") +
+        theme(legend.position = "none") +
+        xlab("Sentiment") + ylab("Total Count") + ggtitle("Sentiment Graph")
+#ggsave("./EDA_sentiment.png")
+
+```
+
+  We see that most of the tweets conveyed a negative sentiment than a positive one. Over 6000 words conveyed fear, and nearly 4500 conveyed anger, followed by 4500 of sadness. In total, negative sentiment were conveyed by nearly 6500 words, while the positive ones by 5000 words. Let's calculate precentages of polarity below!
+  
+```{r}
+
+# get total number of words
+total_word_count <- sum(df.sentiment$count)
+
+negative_feelings <- list('anger', 'disgust', 'fear', 'sadness', 'negative')
+positive_feelings <- list('joy', 'trust', 'positive', "anticipation") 
+neutral_feelings <- list('surprise')
+
+negative_total = 
+  sum(df.sentiment[df.sentiment$sentiment %in% negative_feelings,]$count) 
+positive_total = 
+  sum(df.sentiment[df.sentiment$sentiment %in% positive_feelings,]$count)
+neutral_total = 
+  sum(df.sentiment[df.sentiment$sentiment %in% neutral_feelings,]$count)
+
+negative_precentage = (negative_total/total_word_count)*100
+positive_precentage = (positive_total/total_word_count)*100
+neutral_precentage = (neutral_total/total_word_count)*100
+
+polatiryTable <- data.frame("polarity" = character(), "precentage" = double(), stringsAsFactors=FALSE)
+polatiryTable <- rbind(polatiryTable, data.frame("polarity" = "positive", "precentage"=round(positive_precentage, digit=2)))
+polatiryTable <- rbind(polatiryTable, data.frame("polarity" = "negative", "precentage"=round(negative_precentage, digit=2)))
+polatiryTable <- rbind(polatiryTable, data.frame("polarity" = "neutral", "precentage"=round(neutral_precentage, digit=2)))
+
+polatiryTable
+#write.csv(polatiryTable, file="./polarity.csv", row.names=FALSE)
+
+```
+
+  Again, we see that negative tweets dominate tweets on Uber. Focusing only on the polarity (positiveness and negativeness) in general, we notice that nearly 61% of the words in the tweets have a negative sentiment, while the positive words represent only 29% of the total number of words. I used a pie chart to visualize it below.
+
+```{r}
+# used online color palette generator for codes
+colors=c("#FF595E", "#FFD70F", "#8AC926")
+
+pie(as.numeric(polatiryTable$precentage), 
+    labels = paste0(polatiryTable$polarity, " ",
+                    polatiryTable[polatiryTable$polarity ,]$precentage, "%")
+    , col=colors)
+
+```
+
+Before we leave sentiments alone, I wanted to explore the sentiments of the tweets overtime. Below is a function that takes a list of tweets and returns a list of their sentiment scores. 
+
+```{r}
+
+GetSentimentPerTweet <- function(tweets){
+  # prepare vars
+  negative_feelings <- list('anger', 'disgust', 'fear', 'sadness', 'negative')
+  positive_feelings <- list('joy', 'trust', 'positive', 'anticipation') 
+  new_col <- NULL
+  
+  # for each tweet, analyze sentiment
+  for (t in tweets) {
+    sent <- GetSentimentalTable(t)
+    
+    # get positiveness and negativeness
+    negative_total = sum(sent[sent$sentiment %in% negative_feelings,]$count)
+    positive_total = sum(sent[sent$sentiment %in% positive_feelings,]$count)
+    
+    # calculate score only if both are non-negative
+      score <- positive_total - negative_total
+      
+      # add new results to col
+      new_col <- rbind(new_col, score)
+  }
+  
+  return(new_col)
+}
+
+```
+
+Now we can use the function above to get the scores of tweets and plot using ggplot. But first, we need to prepare the data with the scores, and remove uneeded entries.
+
+```{r} 
+# copy of tweets 
+temp <- tweets
+
+# replace text with cleaned text
+temp$text <- cleaned_tweets
+
+# remove uneeded columns
+temp <- subset(temp, select = c("text", "created", "retweetCount"))
+
+# convert the date formante to a simple one
+temp$created <- as.Date(temp$created)
+
+# obtain the sentiment scores per tweet
+score <- GetSentimentPerTweet(temp$text)
+#write.csv(score, file="./detailed_sentiment.csv", row.names=FALSE)
+#score <- read.csv("./detailed_sentiment.csv", header=TRUE)
+
+# add the new scores col to out dataframe and create a new dataframe
+df.scores <- cbind(temp, score)
+names(df.scores) <- c("text", "created", "retweetCount", "score")
+
+# now I want to add a col called sentiment, and I want it to have a string representation
+# of the score such that: if score < 0 --> neg, score > 0 --> pos, otherwise neutral
+lst <- list(df.scores$score)
+
+# use double ifelse to get the string sentiment
+sentiment <- rapply(lst , 
+  function(x) ifelse(x < 0, 'negative', ifelse(x > 0, 'positive', 'neutral')))
+
+df.scores <- cbind(df.scores, sentiment)
+names(df.scores) <- c("text", "created", "retweetCount", "score", "sentiment")
+
+```
+
+Let's plot the sentiment of tweets over time!
+
+```{r}
+
+# we don't need text and retweetCount cols anymore, get rid of it!
+df.time <- subset(df.scores, select = c("created", "score", "sentiment"))
+
+# before we group by and summarize
+# since I want to plot a line obove the x axis
+# I will neutralize the negatives by adding the min score 
+# to all the scores
+scalar <- min(df.time$score)
+df.time$score <- df.time$score + -1*scalar
+
+# NOW the fun begins, order, group_by and summarize!
+df.ordered <- df.time[order(sentiment),]
+
+df.ordered <- df.ordered %>% group_by(sentiment, created) %>%
+  summarise(score=sum(score))
+df.ordered = na.omit(df.ordered) 
+
+# ggplot that
+ggplot(df.ordered, aes(created, score)) + 
+  geom_line(aes(group=sentiment, color=sentiment), size=2) +
+  geom_point(aes(group=sentiment, color=sentiment), size=4) + 
+  ggtitle("Sentiment of Tweets Overtime")
+
+ggsave("./EDA_sentimentTime.png")
+
+```
+
+We notice a spike in the negative line on Dec 13, 2017. I was curious and I googled "uber december 13" and it turned out that one of the popular national news is ["Uber Under Criminal Investigation, Justice Dept. Confirms in Letter to Court"](https://www.nytimes.com/2017/12/13/technology/uber-waymo-driverless-cars.html). 
+
+The last sentiment-related analysis I want to do is comparing the number of retweets to the sentiment of the tweet text. Let's prepare the data for plotting and use ggplot. 
+
+```{r}
+
+# keep the cols we need
+df.retweet <- subset(df.scores, select = c("retweetCount", "score", "sentiment"))
+
+df.retweet <- df.retweet[order(sentiment),]
+
+ggplot(df.retweet, aes(x=sentiment)) +
+  geom_bar(aes(y=..count.., fill=sentiment)) +
+  scale_fill_brewer(palette="RdGy") +
+  theme(legend.position="right") +
+  ylab("Number of Tweets") + xlab("Polarity Categories")
+
+ggsave("./EDA_sentimentRetweet.png")
+
+```
+
+## Statistical Analysis
+
+I wrote a function GetFrequencyTable() that returns a dataframe of the tweets words and their frequencies using a TermDocumentMatrix() and basic sum(). Then convered to a dataframe. I will use it to create a dataframe of words and their frequencies in descending order and omitting frequencie equal to 1. Then I can and use statistical functions on them.
+
+```{r, include=F}
+GetFrequencyTable <- function(tweets) {
+  mach_corpus = Corpus(VectorSource(tweets))
+	  
+	# create document term matrix applying some transformations
+	tdm = TermDocumentMatrix(mach_corpus,
+	      control = list(removePunctuation = TRUE,
+	                     removeNumbers = TRUE,
+	                     stopwords = TRUE,
+	                     wordLengths = c(3, Inf),
+	                     tolower = TRUE))
+	m = as.matrix(tdm)
+	  
+	# get word counts in decreasing order
+	word_freqs = sort(rowSums(m), decreasing = TRUE)
+	
+	# create a data frame with words and their frequencies
+	dm = data.frame(words = names(word_freqs), freq = word_freqs, ordered = TRUE)
+	dm = dm[with(dm, order(-freq)),]
+	dm = dm[!dm$freq == 1,]
+	return (dm)
+}
+```
+
+Using statistical equations and simple math functions on the frequenies table
+
+```{r}
+
+frequencyTable <- GetFrequencyTable(cleaned_tweets)
+
+p1 <- paste("mean is: ", mean(frequencyTable$freq))
+p2 <- paste("median is: ", median(frequencyTable$freq))
+p3 <- paste("standard dev is: ", sd(frequencyTable$freq))
+p4 <- paste("min is: ", min(frequencyTable$freq))
+p5 <- paste("max is: ", max(frequencyTable$freq))
+p6 <- paste("qualtile is: ")
+
+p1
+p2
+p3
+p4
+p5
+print(quantile(frequencyTable$freq, c(0.05,0.1,0.25,0.5,0.75,0.9,0.95)))
+
+```
+
+The mean of word frequencies is 27, median is 4, and a standard deviation of 156.
+The min and max are 2 and 3005 respectively, which means that the mean is skewed to the left because most words have a frequency of 4. 
+
+Finally the qualtiles. 95% of the words have frquencies less than 64, and 50% of the words have frequencies less than or equal to 4.
+
+### Bar Graph
+And a bargraph of the most frequent words
+
+```{r}
+
+# get the head - most frequent words
+barGraph <- head(frequencyTable, n=15)
+
+# ggplot bargraph!
+ggplot(barGraph, aes(x = reorder(words, freq), y = freq)) +
+        geom_bar(aes(fill = freq), stat = "identity") +
+        theme(legend.position = "none") +
+        xlab("Words") + ylab("Count") + ggtitle("Words Frequencies") + coord_flip()
+ggsave("./EDA_frequency.png")
+```
+
+### Histogram
+
+A histogram of frequecies of words.
+
+```{r}
+
+# get mot frequent
+histog <- head(frequencyTable, 20)
+
+# plot!!
+# used an online palette generator tool to obtain color codes 
+colors=c("#C58CA1", "#8B4A5E", "#562433", "#E3D2DC")
+hist(histog$freq, right=FALSE, col=colors, main="Histogram of Word Frequencies", xlab="Word Frequencies")
+
+```
+
+### Equation
+
+Before we finish, I create a simple function that calculates the probability of a set of words in the tweets we collected. I tested it with a sample of the tweets.
+
+```{r}
+
+CalculateProbability <- function(words){
+  # the if statement make sure that the word is already used otherwise it returns the value 0  
+  for (w in words) {
+    if (w %in% frequencyTable$word) {
+      u = frequencyTable[which(frequencyTable$word == w),]
+      num = as.numeric(u$freq)
+      prob = round((num/sum(as.numeric(frequencyTable$freq)))*100, digit=2)
+    } else {
+      prob = 0
+    }
+    phrase <- paste(w, ": ", prob)
+    print(phrase)
+  }
+}
+
+test_set <- head(frequencyTable$words, n=15)
+CalculateProbability(test_set)
+
+
+```
+
+------------------------------------------------------------------
+
+# Where are they tweeting from?
+
+  Another interesting data visualization tool is maps! We can extract the tweets on the brand and isolate the tweets with geocodes (longitude and latitude), and plot them on an interactive map!
+  Most tweets returned by Twitter's API are not geocoded. Out of the 16,000 tweets I collected, only 13 of them are geocoded. Plotted below!
+
+```{r}
+
+# removing NA geocodes
+geo_tweets = tweets[!is.na(tweets$longitude),]
+geo_tweets = tweets[!is.na(tweets$latitude),]
+
+m <- leaflet(map) %>% addTiles()
+
+# adding the locations of the tweets. 
+m <- m %>% addCircles(map, lng = as.numeric(geo_tweets$longitude), lat = as.numeric(geo_tweets$latitude),
+                 popup = NULL, weight = 8, radius = 40, color = "#fb3004", stroke = TRUE, fillOpacity = 0.8)
+
+m
+```
