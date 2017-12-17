@@ -14,13 +14,13 @@ Use R to acquire, explore, clean and organize data. Use R packages to manipulate
 	- A summary of the analysis done in the report
 	- Files: presentaion.Rmd, presentaion.html
 
-- Datasets:
+- Data:
 	- I collected 16000 tweets over the span of 8 days (Dec 9-15, 2017, each is 2000 tweets).
-	- Files: tweetsDB.csv
+	- Files: all csv files saved in ./data 
 
 - Assets:
 	- Saved graphs, tables, and images for the analysis and presentaion
-	- Files: multiple .png and .jpeg images, and csv tables.
+	- Files: multiple .png and .jpeg images saved in ./assets
 
 ## Prerequisites:
 - Twitter Tokens
@@ -28,7 +28,7 @@ Use R to acquire, explore, clean and organize data. Use R packages to manipulate
 
 - Packages
 	- The packages below will be installed automatically when you run the shiny app or knit the markdown
-	- twitteR, ROAuth, ggplot2, tm, plyr, leaflet, maps, tmap, syuzhet, Hmisc, stringr, dplyr
+	- twitteR, ROAuth, ggplot2, tm, plyr, leaflet, maps, tmap, syuzhet, Hmisc, stringr, dplyr, RColorBrewer, wordcloud2
 
 ## How to run Shiny app:
 - Shiny App: open server.R and ui.R and `run` either. It will load required packages and authenticate twitter access. I couldn't publish the app since I am doing the twitter authentication through the shiny app server.
