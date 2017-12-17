@@ -20,6 +20,7 @@ PrepareLibraries<-function() {
   GetPackage("plyr")
   GetPackage("RColorBrewer")
   GetPackage("syuzhet")
+  GetPackage("stringr")
 }
 
 # Call the function
@@ -65,18 +66,18 @@ shinyServer(function(input, output) {
       
       # remove common words 
       # collected common words in english
-      common_words <- c('the', 'and', 'that', 'it', 'not', 'he', 'as', 'you',
-                        'this', 'but', 'his', 'they', 'her', 'she', 'or', 'an', 'will',
-                        'my', 'one', 'all', 'would', 'there', 'the', 'to', 'of', 'in',
-                        'for', 'on', 'with', 'at', 'by', 'from', 'about', 'into',
-                        'over', 'after')
+      common_words <- c('the', 'and', 'that', 'not', 'you', 'this', 'but',
+                        'his', 'they', 'her', 'she', 'will', 'one', 'all',
+                        'would', 'there', 'the', 'for', 'with', 'from', 
+                        'about', 'into', 'over', 'after')
+      
       for (word in common_words) {
         clean_text = gsub(word, "", clean_text)
       }
       
       # also the search term!
       clean_text = gsub(tolower(input$searchTerm), "", clean_text)
-      clean_text = gsub(toupper(input$searchTerm), "", clean_text)
+      clean_text = gsub(capitalize(input$searchTerm), "", clean_text)
       
       return (clean_text)
   }
@@ -163,7 +164,7 @@ shinyServer(function(input, output) {
 	})
 	
 	plotSentiment <- function(sentiment_dataframe) {
-	  print(ggplot(sentiment_dataframe, aes(x = sentiment, y = count)) +
+	  print(ggplot(sentiment_dataframe, aes(x = reorder(sentiment, -count), y = count)) +
 	          geom_bar(aes(fill = sentiment), stat = "identity") +
 	          theme(legend.position = "none") +
 	          xlab("Sentiment") + ylab("Total Count") + ggtitle("Sentiment Graph"))
